@@ -3,12 +3,12 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Pong</title>
+    <title>Starlight Collector</title>
     <style>
         body {
-            background-color: #121212;
+            background-color: #0b0b1a;
             color: #ffffff;
-            font-family: 'Comic Sans MS', 'Chalkboard SE', 'Comic Neue', sans-serif;
+            font-family: Arial, sans-serif;
             display: flex;
             flex-direction: column;
             align-items: center;
@@ -16,244 +16,150 @@
             min-height: 100vh;
             margin: 0;
         }
-
         canvas {
-            background-color: #000000;
-            border: 2px solid #ffffff;
-            box-shadow: 0 0 20px rgba(255, 255, 255, 0.2);
+            background-color: #12122b;
+            border: 2px solid #4a4ae2;
+            box-shadow: 0 0 15px rgba(74, 74, 226, 0.5);
         }
     </style>
 </head>
 <body>
 
-    <canvas id="gameCanvas" width="700" height="500"></canvas>
+    <canvas id="gameCanvas" width="600" height="400"></canvas>
 
     <script>
         const canvas = document.getElementById("gameCanvas");
         const ctx = canvas.getContext("2d");
 
-        // Game Constants matching Pygame code
-        const WIDTH = 700;
-        const HEIGHT = 500;
-        const FPS = 60;
-        const PADDLE_WIDTH = 20;
-        const PADDLE_HEIGHT = 100;
-        const BALL_RADIUS = 7;
-        const WINNING_SCORE = 10;
+        
+        let score = 0;
+        let lives = 3;
+        let gameState = "playing"; 
 
-        // Key State Tracking
+        const basket = {
+            x: 250,
+            y: 350,
+            width: 100,
+            height: 15,
+            speed: 7
+        };
+
+        let items = [];
+
+        
         const keys = {};
         window.addEventListener("keydown", (e) => { keys[e.key] = true; });
         window.addEventListener("keyup", (e) => { keys[e.key] = false; });
 
-        class Paddle {
-            constructor(x, y, width, height) {
-                this.originalX = x;
-                this.originalY = y;
-                this.x = x;
-                this.y = y;
-                this.width = width;
-                this.height = height;
-                this.vel = 4;
+        function spawnItem() {
+            const isDebris = Math.random() < 0.3; 
+            items.push({
+                x: Math.random() * (canvas.width - 20) + 10,
+                y: -20,
+                radius: 10,
+                speed: 2 + Math.random() * 2.5,
+                type: isDebris ? "debris" : "star"
+            });
+        }
+
+        
+        setInterval(() => {
+            if (gameState === "playing") {
+                spawnItem();
+            }
+        }, 1000);
+
+        function update() {
+            if (gameState !== "playing") return;
+
+            
+            if (keys["ArrowLeft"] && basket.x > 0) {
+                basket.x -= basket.speed;
+            }
+            if (keys["ArrowRight"] && basket.x + basket.width < canvas.width) {
+                basket.x += basket.speed;
             }
 
-            draw() {
-                ctx.fillStyle = "#FFFFFF";
-                ctx.fillRect(this.x, this.y, this.width, this.height);
-            }
+            
+            for (let i = items.length - 1; i >= 0; i--) {
+                let item = items[i];
+                item.y += item.speed;
 
-            move(up = true) {
-                if (up) {
-                    this.y -= this.vel;
-                } else {
-                    this.y += this.vel;
+                
+                if (
+                    item.y + item.radius >= basket.y &&
+                    item.y - item.radius <= basket.y + basket.height &&
+                    item.x >= basket.x &&
+                    item.x <= basket.x + basket.width
+                ) {
+                    if (item.type === "star") {
+                        score += 1;
+                        if (score >= 30) {
+                            gameState = "win";
+                        }
+                    } else {
+                        lives -= 1;
+                        if (lives <= 0) {
+                            gameState = "gameover";
+                        }
+                    }
+                    items.splice(i, 1);
+                    continue;
+                }
+
+                
+                if (item.y > canvas.height + 20) {
+                    items.splice(i, 1);
                 }
             }
-
-            reset() {
-                this.x = this.originalX;
-                this.y = this.originalY;
-            }
         }
-
-        class Ball {
-            constructor(x, y, radius) {
-                this.originalX = x;
-                this.originalY = y;
-                this.x = x;
-                this.y = y;
-                this.radius = radius;
-                this.maxVel = 5;
-                this.xVel = this.maxVel;
-                this.yVel = 0;
-            }
-
-            draw() {
-                ctx.fillStyle = "#FFFFFF";
-                ctx.beginPath();
-                ctx.arc(this.x, this.y, this.radius, 0, Math.PI * 2);
-                ctx.fill();
-            }
-
-            move() {
-                this.x += this.xVel;
-                this.y += this.yVel;
-            }
-
-            reset() {
-                this.x = this.originalX;
-                this.y = this.originalY;
-                this.yVel = 0;
-                this.xVel *= -1;
-            }
-        }
-
-        // Initialize Game Objects
-        const leftPaddle = new Paddle(10, HEIGHT / 2 - PADDLE_HEIGHT / 2, PADDLE_WIDTH, PADDLE_HEIGHT);
-        const rightPaddle = new Paddle(WIDTH - 10 - PADDLE_WIDTH, HEIGHT / 2 - PADDLE_HEIGHT / 2, PADDLE_WIDTH, PADDLE_HEIGHT);
-        const ball = new Ball(WIDTH / 2, HEIGHT / 2, BALL_RADIUS);
-
-        let leftScore = 0;
-        let rightScore = 0;
-        let isWaitingForReset = false;
 
         function draw() {
-            // Fill Background
-            ctx.fillStyle = "#000000";
-            ctx.fillRect(0, 0, WIDTH, HEIGHT);
+            
+            ctx.fillStyle = "#12122b";
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-            // Draw Scores
-            ctx.fillStyle = "#FFFFFF";
-            ctx.font = "50px 'Comic Sans MS', sans-serif";
-            ctx.textAlign = "center";
-            ctx.fillText(leftScore, WIDTH / 4, 50);
-            ctx.fillText(rightScore, (WIDTH * 3) / 4, 50);
+            if (gameState === "playing") {
+                // Draw Basket
+                ctx.fillStyle = "#4a4ae2";
+                ctx.fillRect(basket.x, basket.y, basket.width, basket.height);
 
-            // Draw Paddles & Ball
-            leftPaddle.draw();
-            rightPaddle.draw();
-            ball.draw();
+                
+                items.forEach(item => {
+                    ctx.beginPath();
+                    ctx.arc(item.x, item.y, item.radius, 0, Math.PI * 2);
+                    ctx.fillStyle = item.type === "star" ? "#00ffff" : "#ff4d4d";
+                    ctx.fill();
+                    ctx.closePath();
+                });
 
-            // Draw Center Dashed Line
-            const segmentHeight = HEIGHT / 20;
-            for (let i = 10; i < HEIGHT; i += segmentHeight) {
-                const index = Math.floor(i / segmentHeight);
-                if (index % 2 === 1) continue;
-                ctx.fillRect(WIDTH / 2 - 5, i, 10, segmentHeight);
-            }
-        }
-
-        function handlePaddleMovement() {
-            // Left Paddle Controls (W / S)
-            if ((keys["w"] || keys["W"]) && leftPaddle.y - leftPaddle.vel >= 0) {
-                leftPaddle.move(true);
-            }
-            if ((keys["s"] || keys["S"]) && leftPaddle.y + leftPaddle.vel + leftPaddle.height <= HEIGHT) {
-                leftPaddle.move(false);
-            }
-
-            // Right Paddle Controls (ArrowUp / ArrowDown)
-            if (keys["ArrowUp"] && rightPaddle.y - rightPaddle.vel >= 0) {
-                rightPaddle.move(true);
-            }
-            if (keys["ArrowDown"] && rightPaddle.y + rightPaddle.vel + rightPaddle.height <= HEIGHT) {
-                rightPaddle.move(false);
-            }
-        }
-
-        function handleCollision() {
-            // Top and Bottom Wall Collisions
-            if (ball.y + ball.radius >= HEIGHT || ball.y - ball.radius <= 0) {
-                ball.yVel *= -1;
-            }
-
-            // Left Paddle Collision
-            if (ball.xVel < 0) {
-                if (ball.y >= leftPaddle.y && ball.y <= leftPaddle.y + leftPaddle.height) {
-                    if (ball.x - ball.radius <= leftPaddle.x + leftPaddle.width) {
-                        ball.xVel *= -1;
-
-                        const middleY = leftPaddle.y + leftPaddle.height / 2;
-                        const differenceInY = middleY - ball.y;
-                        const reductionFactor = (leftPaddle.height / 2) / ball.maxVel;
-                        const yVel = differenceInY / reductionFactor;
-                        ball.yVel = -1 * yVel;
-                    }
+                
+                ctx.fillStyle = "#ffffff";
+                ctx.font = "18px Arial";
+                ctx.fillText(`Score: ${score} / 30`, 20, 30);
+                ctx.fillText(`Lives: ${lives}`, canvas.width - 90, 30);
+            } else {
+                
+                ctx.fillStyle = "#ffffff";
+                ctx.font = "28px Arial";
+                ctx.textAlign = "center";
+                if (gameState === "win") {
+                    ctx.fillText("You Win! Stardust Collected!", canvas.width / 2, canvas.height / 2 - 20);
+                } else {
+                    ctx.fillText("Game Over! Out of Lives.", canvas.width / 2, canvas.height / 2 - 20);
                 }
-            } 
-            // Right Paddle Collision
-            else {
-                if (ball.y >= rightPaddle.y && ball.y <= rightPaddle.y + rightPaddle.height) {
-                    if (ball.x + ball.radius >= rightPaddle.x) {
-                        ball.xVel *= -1;
-
-                        const middleY = rightPaddle.y + rightPaddle.height / 2;
-                        const differenceInY = middleY - ball.y;
-                        const reductionFactor = (rightPaddle.height / 2) / ball.maxVel;
-                        const yVel = differenceInY / reductionFactor;
-                        ball.yVel = -1 * yVel;
-                    }
-                }
+                ctx.font = "15px Arial";
+                ctx.fillText("Refresh the page to play again", canvas.width / 2, canvas.height / 2 + 25);
+                ctx.textAlign = "left";
             }
-        }
-
-        function resetGame() {
-            ball.reset();
-            leftPaddle.reset();
-            rightPaddle.reset();
-            leftScore = 0;
-            rightScore = 0;
-            isWaitingForReset = false;
         }
 
         function gameLoop() {
-            if (!isWaitingForReset) {
-                handlePaddleMovement();
-                ball.move();
-                handleCollision();
-
-                // Point Scoring
-                if (ball.x < 0) {
-                    rightScore += 1;
-                    ball.reset();
-                } else if (ball.x > WIDTH) {
-                    leftScore += 1;
-                    ball.reset();
-                }
-
-                draw();
-
-                // Check Win Condition
-                let won = false;
-                let winText = "";
-
-                if (leftScore >= WINNING_SCORE) {
-                    won = true;
-                    winText = "Left Player Won!";
-                } else if (rightScore >= WINNING_SCORE) {
-                    won = true;
-                    winText = "Right Player Won!";
-                }
-
-                if (won) {
-                    isWaitingForReset = true;
-                    ctx.fillStyle = "#FFFFFF";
-                    ctx.font = "50px 'Comic Sans MS', sans-serif";
-                    ctx.textAlign = "center";
-                    ctx.fillText(winText, WIDTH / 2, HEIGHT / 2);
-
-                    setTimeout(() => {
-                        resetGame();
-                        requestAnimationFrame(gameLoop);
-                    }, 5000);
-                    return;
-                }
-            }
-
+            update();
+            draw();
             requestAnimationFrame(gameLoop);
         }
 
-        // Start Game Loop
         requestAnimationFrame(gameLoop);
     </script>
 </body>
